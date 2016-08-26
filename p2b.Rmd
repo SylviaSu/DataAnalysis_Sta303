@@ -1,0 +1,61 @@
+---
+title: "p2b"
+author: "Yao Su"
+date: "08/06/2016"
+output: pdf_document
+---
+The data set is the scores of students from 20 different schools 
+
+```{r}
+require("lme4")
+require("ggplot2")
+
+#record each time
+result1 <- 0
+result2  <- 0
+result3 <- 0
+for (i in 1:1000){
+  mu_a <- 67
+  sigma_a <- 10
+  sigma_y <- 6
+  n_schools <- 20
+  n_students <- 50
+  dat<- data.frame(matrix(ncol=2, nrow=0))
+  school_alphas <- rnorm(n_schools, mu_a, sigma_a)
+  
+  for (i in 1:n_schools){
+    for (j in 1:n_students){
+    dat <- rbind(dat,c(i,rnorm(1, school_alphas[i], sigma_y)))
+  }
+  }
+  colnames(dat)<- c("school","score")
+  dat$school <- factor(dat$school)
+  #No pooling
+  fit <- lm(score~0+school, data=dat)
+  s <- summary(fit)
+  coefs <- as.data.frame(s$coefficients)
+  sum <- sum((coefs$Estimate-school_alphas)^2)
+  result1 <- result1+sum
+  
+  #complete pooling
+  fit <- lm(score~1, data=dat)
+  s <- summary(fit)
+  coefs <- as.data.frame(s$coefficients)
+  sum <- sum((coefs$Estimate-school_alphas)^2)
+  result2<-result2+sum
+  
+  #partial pooling
+  fit <- lmer(score~(1|school), data=dat)
+  coefs <- coef(fit)
+  sum <- sum((coefs$school$`(Intercept)`-school_alphas)^2)
+  result3 <- result3+sum
+}
+```
+
+```{r}
+result1/1000
+result2/1000
+result3/1000
+```
+
+Based on the results, the partial pooling estimates better. Complete pooling is the worst.

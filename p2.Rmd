@@ -1,0 +1,289 @@
+---
+title: "P2"
+author: "Yao Su"
+output: html_document
+---
+Set up
+```{r setup, include=TRUE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require("boot")
+require("ggplot2")
+require("lme4")
+german <- read.table("german.data", sep = " ")
+colnames(german)<- c("status", "duation", "history", "purpose","credictamount", "savingaccount", "emplomentsince", "installmentrate",
+                     "sexstatus","debtors","residencesince", "property", "age", "installmentplans", "housing","numberofcredits","job","numberofpeople", "telephone","foreignworker", "assesment")
+
+```
+
+Problem1
+
+logit(pi) = b0+b1*numberofpeople + b2I_notforeignworker + b3*numberofpeople*I_notforeignworker
+H0:b3 = 0
+
+Q:Briefly explain why the hypothesis is plausible and why there might be an intreaction between the two covariates.
+
+A: If one is a foreignworkerm, there might be more problems to deal with when looking for people being liable to provide maintenance for, since they may not have family here. Thus the credit assesment for a person with the same number of people being liable to provide maintenance for might be different for local workers and foreignworkers. Thus there might be an interaction. And usually the H0 is what we want to reject, then we say that the Null hypothesis is "The coefficient of the interaction term is equal to 0"
+
+```{r}
+#bad: -(assesment-2) = 0  good: -(assesment-2) = 1 
+fitfull <-glm(-(assesment-2)~numberofpeople+foreignworker+numberofpeople*foreignworker, data=german, family=binomial(link="logit"))
+summary(fitfull)
+fitfull$aic
+fitred <-glm(-(assesment-2)~numberofpeople+foreignworker, data=german, family=binomial(link="logit"))
+fitred$aic
+```
+Q:Determine whether you need to include the interaction and state your conclusion concerning the hypothesis.
+
+A:Since the P-value of b3 is greater than 0.05. We can not reject H0. That means there is no significant evidence to reject H0, which means we can not reject that the coefficient of the interaction term is equal to 0. Thus it's better to not include it in the model.
+
+
+problem2
+
+```{r}
+fit1 <-glm(-(assesment-2)~job, data=german, family=binomial(link="logit"))
+#Helper funtion
+words_to_num <- function(word){
+  return(switch(as.character(word), "A171"={0}, "A172"={1},  "A173"={2}, "A174"={3}))
+}
+
+german$jobnum <-as.numeric(sapply(german$job, words_to_num))
+fit2 <-glm(-(assesment-2)~jobnum, data=german, family=binomial(link="logit"))
+cost_negloglikelihood <- function(r, pi) -sum(r*log(pi)+(1-r)*log(1-pi))
+cv.glm(data=german, glmfit=fit1, cost=cost_negloglikelihood, K=5)$delta[1]
+cv.glm(data=german, glmfit=fit2, cost=cost_negloglikelihood, K=5)$delta[1]
+```
+Based on the cross validation results, the model with numerical values has lower cost.
+
+```{r}
+#quantitative
+jobnums <- data.frame(jobnum=german$jobnum)
+predictions2 <- predict(fit2, newdata=jobnums, type="response", se=TRUE)
+ggdata <- data.frame(job = jobnums$jobnum,
+                     pred = predictions2$fit,
+                     LL = predictions2$fit-1.96*predictions2$se.fit,
+                     UL = predictions2$fit+1.96*predictions2$se.fit
+
+                     )
+ggplot(ggdata, aes(x = job, y = pred)) + 
+  geom_ribbon(aes(ymin = LL, ymax = UL), alpha = .2) +
+  geom_line(colour="blue", size=1)
+```
+
+The logits of the probability of a customer being creditable versus numerical variants of Attribute 17 looks like linear, which satisfies the assumption of the logestic regression.
+
+```{r}
+#qualitative
+A171<- subset(german,job=="A171",select = c(job,assesment))
+PA171 <-nrow(A171[A171$assesment == 1,])/nrow(A171)
+A172<- subset(german,job=="A172",select = c(job,assesment))
+PA172 <-nrow(A172[A172$assesment == 1,])/nrow(A172)
+A173<- subset(german,job=="A173",select = c(job,assesment))
+PA173 <-nrow(A173[A173$assesment == 1,])/nrow(A173)
+A174<- subset(german,job=="A174",select = c(job,assesment))
+PA174 <-nrow(A174[A174$assesment == 1,])/nrow(A174)
+job <- data.frame(matrix(ncol=2, nrow=4))
+job$X1[1] <- "A171"
+job$X1[2] <- "A172"
+job$X1[3] <- "A173"
+job$X1[4] <- "A174"
+job$X2[1] <- logit(PA171)
+job$X2[2] <- logit(PA172)
+job$X2[3] <- logit(PA173)
+job$X2[4] <- logit(PA174)
+plot(job$X2~c("1","2","3","4"))
+```
+
+The logits of the probability of a customer being creditable versus qualitative variants of Attribute 17 looks is not linear.
+Based on the plots, the model with numerical data is better.
+
+Problem3
+
+Q:Why can't you simply take the first 500 rows and use them as the training set, and the second 500 rows and use the as the test set?
+A:Seperating the dataset into trainig set and test set randomly is to ensure there is no systematic difference between the partitions.
+
+```{r}
+# cost function based on the cost matrix
+cost_spe <- function(r, pi) mean(5*(r==0)*(abs(r-pi) > 0.5)+(r==1)*(abs(r-pi) > 0.5))
+#generate 500 random row numbers
+rows <- sort(sample(1:1000, 500, replace=F))
+training <- data.frame(matrix(ncol=21, nrow=0))
+test <- data.frame(matrix(ncol=21, nrow=0)) 
+colnames(training) <- c("status", "duation", "history", "purpose","credictamount", "savingaccount", "emplomentsince", "installmentrate",
+                        "sexstatus","debtors","residencesince", "property", "age", "installmentplans", "housing","numberofcredits","job","numberofpeople", "telephone","foreignworker", "assesment")
+colnames(test) <- c("status", "duation", "history", "purpose","credictamount", "savingaccount", "emplomentsince", "installmentrate",
+                    "sexstatus","debtors","residencesince", "property", "age", "installmentplans", "housing","numberofcredits","job","numberofpeople", "telephone","foreignworker", "assesment")
+
+#split the dataset into two datasets
+for (i in 1:1000){
+  if (i %in% rows){
+    training <- rbind(training, german[i,])
+  }
+  else{
+  test <- rbind(test, german[i,])
+}
+}
+
+fit_full <-glm(-(assesment-2)~job+foreignworker+age+sexstatus+history+status+duation, data=german, family=binomial(link="logit"))
+fit_reduced1 <-glm(-(assesment-2)~job+age+sexstatus+history+status, data=german, family=binomial(link="logit"))
+fit_reduced2 <-glm(-(assesment-2)~job+age+sexstatus+history, data=german, family=binomial(link="logit"))
+
+cv.glm(data=german, glmfit=fit_full, cost=cost_spe, K=5)$delta[1]
+cv.glm(data=german, glmfit=fit_reduced1, cost=cost_spe, K=5)$delta[1]
+cv.glm(data=german, glmfit=fit_reduced2, cost=cost_spe, K=5)$delta[1]
+
+#validation on the test set
+predictions <- data.frame(predict(fit_full, newdata=test, type="response", se=TRUE))$se.fit
+test$pred <- predictions
+test$ob <- -(test$assesment-2)
+```
+
+Based on the cross validation on the training set, the full model works better.
+Evaluate this model on the test set, the average cost calculated based on the cost matrix is
+```{r}
+cost_spe(test$ob,test$pred)
+```
+
+Problem4
+
+```{r}
+#training set with size 50
+rows <- (sample(1:500, 50, replace=F))
+training1 <- data.frame(matrix(ncol=21, nrow=0))
+colnames(training1) <- c("status", "duation", "history", "purpose","credictamount", "savingaccount", "emplomentsince", "installmentrate",
+                        "sexstatus","debtors","residencesince", "property", "age", "installmentplans", "housing","numberofcredits","job","numberofpeople", "telephone","foreignworker", "assesment")
+
+#subset from the training set in Problem3
+for (i in 1:500){
+  if (i %in% rows){
+    training1 <- rbind(training1, training[i,])
+  }
+}
+
+fit3 <-glm(-(assesment-2)~numberofpeople+residencesince+duation+credictamount+installmentrate+numberofcredits+age, data=training1, family=binomial(link="logit"))
+cost_classification <- function(r, pi) mean(abs(r-pi) > 0.5)
+cost_negloglikelihood <- function(r, pi) -sum(r*log(pi)+(1-r)*log(1-pi))
+
+#function to generate false positive and false negtive rates
+fpfn <- function(r, pi){
+  false_pos <- sum((r==0) * (abs(r-pi) > 0.5))/sum(r==0)
+  false_neg <- sum((r==1) * (abs(r-pi) > 0.5))/sum(r==1)
+  return(data.frame(false_pos=false_pos, false_neg=false_neg))
+}
+
+predictions <- data.frame(predict(fit3, newdata=training1, type="response", se=TRUE))$fit
+training1$pred <- predictions
+training1$ob <- -(training1$assesment-2)
+#classification cost on training set
+cost_classification(training1$ob,training1$pred)
+#Nll cost on training set
+cost_negloglikelihood(training1$ob,training1$pred)/dim(training1)[1]
+#false positive rate and false negtaive rate on training set
+fpfn(training1$ob,training1$pred)
+predictions <- data.frame(predict(fit3, newdata=test, type="response", se=TRUE))$fit
+test$pred <- predictions
+test$ob <- -(test$assesment-2)
+#classification on test set
+cost_classification(test$ob,test$pred)
+#NLL cost in test set
+cost_negloglikelihood(test$ob,test$pred)/dim(test)[1]
+#false positive rate and false negtaive rate on test set
+fpfn(test$ob,test$pred)
+
+```
+
+Problem5
+```{r}
+lines <- 
+  "Game   Scored  N.Attempts
+1   4   5
+2   5   11
+3   5   14
+4   5   12
+5   2   7
+6   7   10
+7   6   14
+8   9   15
+9   4   12
+10  1   4
+11  13  27
+12  5   17
+13  6   12
+14  9   9
+15  7   12
+16  3   10
+17  8   12
+18  1   6
+19  18  39
+20  3   13
+21  10  17
+22  1   6
+23  3   12"
+con <- textConnection(lines)
+shaq <- read.csv(con, sep="")
+```
+
+Problem5a
+
+H0: The probability of successfully scoring from a free throw was the same in different days (the coefficient of "Game" equals to 0)
+```{r}
+shaq$game <- factor(shaq$Game)
+full <- glm(cbind(Scored, N.Attempts-Scored) ~ game, family=binomial(link="logit"), data=shaq)
+reduced <- glm(cbind(Scored, N.Attempts-Scored)~1, family=binomial(link="logit"), data=shaq)
+anova(reduced, full, test="LRT")
+```
+
+The P-Value is less than 0.05. We could reject H0. That means the probability of successfully scoring from a free throw was different in different days.
+
+Problem5b
+```{r}
+s <- summary(full)
+coefs <- as.data.frame(s$coefficients)
+coefs$prob <- 1/(1+exp(-coefs$Estimate))
+g <- rownames(coefs)
+#comfidence interval:
+ymin=1/(1+exp(-(coefs$Estimate-1.96*coefs$`Std. Error`)))
+ymax=1/(1+exp(-(coefs$Estimate+1.96*coefs$`Std. Error`)))
+
+ggplot(coefs, aes(x =rownames(coefs), y = prob)) +  
+  geom_errorbar(aes(ymin=1/(1+exp(-(Estimate-1.96*`Std. Error`))), ymax=1/(1+exp(-(Estimate+1.96*`Std. Error`)))))
+
+#compelete pooling
+s <- summary(reduced)
+coefs <- as.data.frame(s$coefficients)
+coefs$prob <- 1/(1+exp(-coefs$Estimate))
+#comfidence interval:
+ymin=1/(1+exp(-(coefs$Estimate-1.96*coefs$`Std. Error`)))
+ymax=1/(1+exp(-(coefs$Estimate+1.96*coefs$`Std. Error`)))
+
+ggplot(coefs, aes(x =rownames(coefs), y = prob)) +  
+  geom_errorbar(aes(ymin=1/(1+exp(-(Estimate-1.96*`Std. Error`))), ymax=1/(1+exp(-(Estimate+1.96*`Std. Error`)))))
+
+#partial pooling
+s <- glmer(cbind(Scored, N.Attempts-Scored)~(1|game), family=binomial(link="logit"), data=shaq)
+x<-coef(s)$game$`(Intercept)`
+y <- plogis(x)
+plot(c(1:23),y)
+```
+
+Problem5c
+
+The number of successfully scoring follows the Binomial distribution.
+No pooling: he complete pooling model assumes a separate chance-of-success parameter a_j for each game j, where the a_j are assumed to be independent.
+Complete pooling: The complete pooling model assumes a single parameter a representing the chance of success for all games in different days
+Partial pooling: The partial pooling assumes there are some amount of pooling between these two extremes of complete pooling and no pooling. We assume  aj~N(u_a,sigma_a^2) where aj is the chance-of-success of game j 
+ 
+ 
+Problem6
+
+One scenario:
+There are students from 20 different schools taking the same test and we want to analyze the average performance of the different schools.
+y_i is the score of ith student
+j[i] is the school to which the ith student belongs
+a_j is the average performance of jth school
+
+mean_a = 67, which is usually the average score of tests. sigma_a = 10. sigma_y = 6
+
+Why does this make sense?
+
+The test scores usually follow a normal distribution and different schools usually have different performance, because different school sizes, different teachers, different teaching facilities and some other factors may result in different average performance. That's why we assume that different schools have different means. And 67 is usually the average score in university and sigma_y is the standard deviation of one student. I estimated from my transcript. Sigma_a is the overall standard deviation of the school, whilch should be larger than sigma_y. I think 10 makes sence.
+

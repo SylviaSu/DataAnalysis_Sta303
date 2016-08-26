@@ -1,0 +1,295 @@
+---
+title: "anova"
+author: "Yao Su"
+date: "07/13/2016"
+output: pdf_document
+---
+Set up
+```{r setup, include=TRUE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(Sleuth3)
+require(xtable)
+
+fish = case0602
+dat <- read.csv("grants.csv")
+colnames(dat)[3] <- "Ward"
+colnames(dat)[4] <- "Area"
+colnames(dat)[6] <- "Total"
+```
+
+Helper function
+
+```{r}
+get_only_multiple_occ <- function(dat){
+  new_dat <- data.frame(matrix(ncol = dim(dat)[2], nrow=0))
+  colnames(new_dat) <- colnames(dat)
+  
+  for (i in 1:dim(dat)[1]){
+    if (sum(dat[i, "Ward"]==dat[, "Ward"]) > 1){
+      new_dat <- rbind(new_dat, dat[i,])
+    }
+  }
+  return(new_dat)
+}
+```
+
+Problem 2 
+Boxplot
+```{r}
+boxplot(Total~Ward,data=dat, main="Grant amounts", 
+        ylab="Grants amount", xlab="Wards")
+```
+
+Why is it not reasonable to use ANOVA on the entire dataset?
+In terms of the boxplot, we could see from the plot that there are many outliers and even a significant outlier around ward 13. Without dealing with those outliers before using ANOVA, we may valid the assumptions of ANOVA since the variances may vary a lot and the distributions of the residuals are not normal.
+
+In terms of the service of area, based on the common sense, those areas used for "City wide" usually get more grants compared to those areas used for some specific services. In this case, if we want to see whether there are some wards receive larger grants, on average, it would be better to remove thoes used for "city-wide" before using ANOVA.
+
+Problem 3
+```{r}
+#clean the data
+attach(dat)
+newdat <- dat[ which(Area!='City-wide' & Total < 200000),]
+#clean more
+newdat <- newdat[! grepl("City",newdat$Area),]
+detach(dat)
+
+#F-test
+
+fWARD<-factor(newdat$Ward)
+fit <- lm(Total~fWARD, data=newdat)
+plot(fit,1)
+plot(fit,2)
+anova(fit)
+
+```
+The residuals are not spread equally around the 0 line and the residuals becomes larger as fitted values goes larger.This suggests that the variances of the error terms are not equal and it seems to indicate dependency between the residuals and the fitted values.
+In addition, there are some residuals stands out from the basic random pattern of residuals. This suggests that there are some outliers.
+
+In the Normal QQ plot, the points fall along a line in the middle of the graph, but curve off in the extremities. It seems to indicate that the data have more extreme values than would be expected if they truly came from a Normal distribution. 
+
+The p-value of this F test is greater than 0.05, which indicates that we can not reject the hypothesis that the Wards don???t differ from each other in terms of the average size of the grants given to them. 
+
+Problem 4
+
+```{r}
+newdat <- get_only_multiple_occ(newdat)
+with(newdat, pairwise.t.test(Total, Ward, p.adj = "none"))
+with(newdat, pairwise.t.test(Total, Ward, p.adj = "bonf"))
+fWARD<-factor(newdat$Ward)
+TukeyHSD(aov(lm(Total ~ fWARD, data= newdat)), conf.level = 0.95)
+```
+
+1. There are some p-values less than 0.05 in the p-value table with no adjustment, which means we could reject the hypothesis of some of those pairwise t-tests but there isn't any p-value less than 0.05 after using Bonferroni adjustments and TukeyHSD. The test becomes less conservative after using adjustments.
+
+2. If no significant differences was observed when using Bonferroni adjustment/Tukey???s HSD, it is not appropriate to conclude that there are no significant differences between any of the means. Because this just means that there isn't enough evidence available to suggest the null hypothesis is false at the 95% confidence level. 
+
+3. One of the assumptions of the paired-wise t-test is that the differences of the pairs follow a normal distribution. Thus if there is only one data point in some ward, it doesn't make sense to say the differences follow a normal distribution.
+
+Problem 5 and 6
+```{r}
+avgdat <- aggregate(fish$`Percentage`, by=list(fish$'Pair'), mean)
+vardat <- aggregate(fish$`Percentage`, by=list(fish$'Pair'), var)
+simumean <- mean(avgdat$x)
+simusd <- sqrt(238.93) #pooled sd, mse
+recordtotal <- c()
+recordtotalbonf <- c()
+mt <- c()
+mtbonf <- c()
+for (i in 1:1000){
+  dat <- data.frame(matrix(ncol=2, nrow=0))
+  colnames(dat) <- c("Pair", "Percentage")
+  new_dat <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(new_dat) <- c("Pair", "Percentage")
+  pair <- "Pair1"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair2"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair3"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair4"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair5"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair6"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  p <- with(dat, pairwise.t.test(Percentage, Pair, p.adj = "none"))$p.value
+  pbonf <- with(dat, pairwise.t.test(Percentage, Pair, p.adj = "bonf"))$p.value
+  mt <- c(mt, sum(p<.05, na.rm=TRUE)>0)
+  mtbonf <- c(mtbonf, sum(pbonf<.05, na.rm=TRUE)>0)
+}
+mean(mt)
+mean(mtbonf)
+```
+
+Problem 7
+
+One possible scenario might be there is one group where the two male fish have significant different length and different degree of activity. The yellow fish is larger and more active then those female fishes in that group may spend more time with yellow swordtailed fish comparied to other groups.
+
+Problem 8
+
+When the difference of the means of different pairs are 12.85.
+```{r}
+recordtotalfvalue <- c()
+for (i in 1:5000){
+  dat <- data.frame(matrix(ncol=2, nrow=0))
+  colnames(dat) <- c("Pair", "Percentage")
+  new_dat <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(new_dat) <- c("Pair", "Percentage")
+  pair <- "Pair1"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean+12.85, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair2"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair3"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair4"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair5"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair6"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  fit <- lm(Percentage~Pair, data=dat)
+  fvalue <- anova(fit)$`Pr(>F)`[1] < 0.05
+  recordtotalfvalue <- rbind(recordtotalfvalue, fvalue)
+}
+mean(recordtotalfvalue)
+```
+
+Problem9
+
+When the variance of the data in pairs are not all the same, the assumption of ANOVA is valid.
+When one of the variance of one pair is 100 times larger than the other pairs'
+One possible scenario might be there is one group where the female fishes in this group are quite different with each other. Some of them were very active and spent more time with yellow-swordtailed fish but some of them were ill and inactive.
+With 1000 simulations, the F-test would find that the means are significant about 15% of the time while there isn't any differences between the means. The F-test is not well behaved. 
+```{r}
+recordtotalfvalue <- c()
+for (i in 1:1000){
+  dat <- data.frame(matrix(ncol=2, nrow=0))
+  colnames(dat) <- c("Pair", "Percentage")
+  new_dat <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(new_dat) <- c("Pair", "Percentage")
+  pair <- "Pair1"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = 10*simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair2"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair3"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair4"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair5"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair6"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  fit <- lm(Percentage~Pair, data=dat)
+  fvalue <- anova(fit)$`Pr(>F)`[1] >= 0.05
+  recordtotalfvalue <- rbind(recordtotalfvalue, fvalue)
+}
+mean(recordtotalfvalue)
+

@@ -1,0 +1,326 @@
+---
+title: "p1b"
+author: "Yao Su"
+date: "07/14/2016"
+output: html_document
+---
+Set up
+```{r setup, include=TRUE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(Sleuth3)
+require(ggplot2)
+require(xtable)
+fish = case0602
+avgdat <- aggregate(fish$`Percentage`, by=list(fish$'Pair'), mean)
+vardat <- aggregate(fish$`Percentage`, by=list(fish$'Pair'), var)
+simumean <- mean(avgdat$x)
+simusd <- sqrt(238.93) #pooled sd, mse
+```
+
+#Homogeneity of Variances
+The variances of the original data in each group are not the same, which doesn't satisfy the ANOVA assumption.
+This makes the test less conservative.
+If we asume the variances are the same while they are actrually not and we conclude to reject the hypothesis, the probability of type 1 error (ie. the conclution is wrong) will be larger than 5%.
+
+```{r}
+
+boxplot(fish$Percentage~fish$Pair) ## shows different variances and Pair 5 and Pair 6 have significant outliers
+
+#with same varances
+recordtotalfvalue <- c()
+for (i in 1:1000){
+  dat <- data.frame(matrix(ncol=2, nrow=0))
+  colnames(dat) <- c("Pair", "Percentage")
+  new_dat <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(new_dat) <- c("Pair", "Percentage")
+  pair <- "Pair1"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair2"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair3"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair4"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair5"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair6"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  fit <- lm(Percentage~Pair, data=dat)
+  fvalue <- anova(fit)$`Pr(>F)`[1] < 0.05
+  recordtotalfvalue <- rbind(recordtotalfvalue, fvalue)
+}
+mean(recordtotalfvalue)
+
+```
+
+```{r}
+#with different varances
+recordtotalfvalue <- c()
+for (i in 1:1000){
+  dat <- data.frame(matrix(ncol=2, nrow=0))
+  colnames(dat) <- c("Pair", "Percentage")
+  new_dat <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(new_dat) <- c("Pair", "Percentage")
+  pair <- "Pair1"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[1]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair2"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[2]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair3"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[3]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair4"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[4]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair5"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[5]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair6"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[6]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  fit <- lm(Percentage~Pair, data=dat)
+  fvalue <- anova(fit)$`Pr(>F)`[1] < 0.05
+  recordtotalfvalue <- rbind(recordtotalfvalue, fvalue)
+}
+mean(recordtotalfvalue)
+
+```
+
+#Normality and outliers
+```{r}
+p1<-subset(fish, Pair == "Pair2")
+p2<-subset(fish, Pair == "Pair2")
+p3<-subset(fish, Pair == "Pair3")
+p4<-subset(fish, Pair == "Pair4")
+p5<-subset(fish, Pair == "Pair5")
+p6<-subset(fish, Pair == "Pair6")
+par(mfrow=c(3,2))
+qqnorm(p1$Percentage)
+qqline(p1$Percentage)
+qqnorm(p2$Percentage)
+qqline(p2$Percentage)
+qqnorm(p3$Percentage)
+qqline(p3$Percentage)
+qqnorm(p4$Percentage)
+qqline(p4$Percentage)
+qqnorm(p3$Percentage)
+qqline(p4$Percentage)
+qqnorm(p5$Percentage)
+qqline(p6$Percentage)
+par(mfrow=c(1,1))
+qqnorm(fish$Percentage)
+qqline(fish$Percentage)
+```
+
+There are some outliers in the data and we could see from the histgraph that the data in each groups are not all well normally distributed. Somme of them have fat tail.
+This will make the test less conservative and probability of type 1 error will be larger than 0.05.
+
+Simulation:
+I want to simulate a group of data which has fat tail. 
+
+```{r}
+#one group has fat tail but same mean with other groups
+recordtotalfvalue <- c()
+for (i in 1:1000){
+  dat <- data.frame(matrix(ncol=2, nrow=0))
+  colnames(dat) <- c("Pair", "Percentage")
+  new_dat <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(new_dat) <- c("Pair", "Percentage")
+  pair <- "Pair1"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair2"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair3"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair4"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair5"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair6"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = simusd)
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  # add some extrame values
+  dat[1,1] <- runif(1, 30, 40)
+  dat[1,2] <- runif(1, 30, 40)
+  dat[1,3] <- runif(1, 80, 90)
+  dat[1,4] <- runif(1, 80, 90)
+  
+  fit <- lm(Percentage~Pair, data=dat)
+  fvalue <- anova(fit)$`Pr(>F)`[1] < 0.05
+  recordtotalfvalue <- rbind(recordtotalfvalue, fvalue)
+}
+mean(recordtotalfvalue)
+
+```
+
+##Finally, simulating a data set where variances are not the same and there are 4 groups have fat-tailed distributed data.
+
+```{r}
+recordtotalfvalue <- c()
+for (i in 1:1000){
+  dat <- data.frame(matrix(ncol=2, nrow=0))
+  colnames(dat) <- c("Pair", "Percentage")
+  new_dat <- data.frame(matrix(ncol=2, nrow=1))
+  colnames(new_dat) <- c("Pair", "Percentage")
+  pair <- "Pair1"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[1]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair2"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[2]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair3"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[3]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair4"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[4]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair5"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[5]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  pair <- "Pair6"
+  for (i in 1:14){
+    percentage <- rnorm(1, mean= simumean, sd = sqrt(vardat$x[6]))
+    new_dat["Pair"] <- pair
+    new_dat["Percentage"] <- percentage
+    dat <- rbind(dat, new_dat)
+  }
+  
+  dat[6,1] <- runif(1, 30, 40)
+  dat[6,2] <- runif(1, 30, 40)
+  dat[6,3] <- runif(1, 80, 90)
+  dat[6,4] <- runif(1, 80, 90)
+  dat[5,1] <- runif(1, 30, 40)
+  dat[5,2] <- runif(1, 30, 40)
+  dat[5,3] <- runif(1, 80, 90)
+  dat[5,4] <- runif(1, 80, 90)
+  fit <- lm(Percentage~Pair, data=dat)
+  fvalue <- anova(fit)$`Pr(>F)`[1] < 0.05
+  recordtotalfvalue <- rbind(recordtotalfvalue, fvalue)
+}
+mean(recordtotalfvalue)
+```
+
